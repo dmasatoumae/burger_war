@@ -1,17 +1,12 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="side" default="r"/> <!-- "b" = blue side, "r" = red side  -->
+    <include file="$(find burger_navigation)/launch/burger_navigation.launch"/>
 
-    <!-- You can change control program  -->
-
-
-    <!-- sample program node -->
-
-    <node pkg="burger_war" type="randomRun.py" name="randomRun" output="screen"/>
-
-    <!-- END sample program node -->
-
-
-    <!-- End of your space  -->
+    <node pkg="burger_war" type="domaeBot.py" name="domaeBot" output="screen"/>
+    <!--<npde pkg="burger_war" type="detect_enemy.py" name="detect_enemy" output="screen" />-->
+    <!--<include file="$(find burger_war)/launch/obstacle_detector.launch">-->
+    <!-- name="robot_namespace" default="$(arg robot_namespace)"/>
+  </include>-->
 </launch>
 
