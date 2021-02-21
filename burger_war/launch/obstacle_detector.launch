@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="obstacle_detector" name="obstacle_extractor" type="obstacle_extractor_node">
+    <param name="use_scan" value="true"/>
+    <param name="use_pcl" value="false"/>
+    <param name="min_x_limit" value="-1.2"/>
+    <param name="max_x_limit" value="1.2"/>
+    <param name="min_y_limit" value="-1.2"/>
+    <param name="max_y_limit" value="1.2"/>
+
+
+  </node>
+
+  <node pkg="obstacle_detector" name="obstacle_tracker" type="obstacle_tracker_node">
+    
+  </node>
+</launch>
