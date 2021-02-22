@@ -5,6 +5,7 @@ import random
 import math
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from sensor_msgs.msg import LaserScan
 
 from obstacle_detector.msg import Obstacles
 
@@ -22,6 +23,7 @@ class enemy_detect():
         self.next_point = [0.0,0.0,0.0]
         self.near_enemy_range = 0.8
         self.near_enemy = False
+        self.near_wall = False
         self.enemy_pub = tf.TransformBroadcaster()
 
     def judge_enemy(self, ob_x, ob_y, bot_pose_x, bot_pose_y):
@@ -34,13 +36,13 @@ class enemy_detect():
         # フィールド内のオブジェクトと比較
         if (ob_x > -0.3 and ob_x < 0.3) and (ob_y > -0.3 and ob_y < 0.3):
             return 0
-        elif (ob_x < 0.6 and ob_x > 0.4) and (ob_y > 0.4 and ob_y < 0.6):
+        elif (ob_x < 0.55 and ob_x > 0.47) and (ob_y > 0.4 and ob_y < 0.6):
             return 0
-        elif (ob_x > -0.6 and ob_x < -0.4) and (ob_y > 0.4 and ob_y < 0.6):
+        elif (ob_x > -0.55 and ob_x < -0.47) and (ob_y > 0.4 and ob_y < 0.6):
             return 0
-        elif (ob_x > 0.4 and ob_x < 0.6) and (ob_y > -0.6 and ob_y < -0.4):
+        elif (ob_x > 0.47 and ob_x < 0.55) and (ob_y > -0.6 and ob_y < -0.4):
             return 0
-        elif (ob_x > -0.6 and ob_x < -0.4) and (ob_y > -0.6 and ob_y < -0.4):
+        elif (ob_x > -0.55 and ob_x < -0.47) and (ob_y > -0.6 and ob_y < -0.4):
             return 0
         
         self.pose_x = ob_x
@@ -57,7 +59,7 @@ class enemy_detect():
         y_difference = self.pose_y - bot_pose_y
         #print (math.sqrt((x_difference**2)+(x_difference**2)))
         if math.sqrt((x_difference**2)+(x_difference**2)) <= self.near_enemy_range:
-            print "near_enemy"
+            #print "near_enemy"
             self.near_enemy = True
             
         else:
@@ -76,6 +78,7 @@ class domaeBot():
         self.near_enemy = False
         self.pose_sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.pose_callback)
         self.obstacle_sub = rospy.Subscriber('/tracked_obstacles', Obstacles, self.obstacle_callback)
+        self.lider_sub = rospy.Subscriber('/scan', LaserScan, self.lider_callback)
         # velocity publisher
         self.vel_pub = rospy.Publisher('cmd_vel', Twist,queue_size=1)
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
@@ -110,6 +113,10 @@ class domaeBot():
                     self.client.cancel_all_goals()
                     self.waypoint_number = before_waypoint_number
                     self.before_mode_name = "see_enemy"
+
+    def lider_callback(self, data):
+        self.scan = data.ranges
+        self.near_wall = self.judge_near_wall(self.scan)
             
     def setGoal(self,x,y,yaw):
         self.client.wait_for_server()
@@ -132,17 +139,32 @@ class domaeBot():
             rospy.logerr("Action server not available!")
             rospy.signal_shutdown("Action server not available!")
         else:
-            return self.client.get_result()   
+            return self.client.get_result() 
 
-    # 敵の方向を向く
+    def judge_near_wall(self, scan):  
+        if not len(scan) == 360:
+            return False
+        back_scan = scan[:190] + scan[170:]
+        back_scan = [x for x in back_scan if x > 0.1]
+        if min(back_scan) < 0.2:
+            print("back_near_wall")
+            return True
+        return False
+        
+        
+
+    # 敵の方向を向いて逃げる
     def see_enemy(self):
-        print("see_enemy")
+        #print("see_enemy")
         th = (math.atan2(self.e_detect.pose_y - self.pose_y, self.e_detect.pose_x - self.pose_x)) - self.th 
         twist = Twist()
-        twist.linear.x = -0.01; twist.linear.y = 0; twist.linear.z = 0
+        twist.linear.x = -0.05; twist.linear.y = 0; twist.linear.z = 0
         twist.angular.x = 0; twist.angular.y = 0; twist.angular.z = th
+        if self.near_wall == True:
+            twist.linear.x = 0.01
+
         #self.client.cancel_goal()
-        print("th = ",th)
+        #print("th = ",th)
         self.vel_pub.publish(twist)
         self.e_detect.near_enemy=False
 
@@ -183,6 +205,7 @@ class domaeBot():
                 elif self.waypoint_number == 1:
                     self.setGoal(-0.85,0.45,3.1415/2)
                     self.setGoal(-0.85,0.45,3.1415/4)
+                    self.setGoal(-0.85,0.45,0)
                     self.waypoint_number = 2
                 elif self.waypoint_number == 2 or self.waypoint_number == 3:
                     self.setGoal(-0.5,0.0,0)
@@ -203,9 +226,9 @@ class domaeBot():
                     self.setGoal(0.5,0.0,3.1415)
                     self.waypoint_number = 6
                 elif self.waypoint_number == 6:
-                    self.setGoal(0.85,-0.45,0)
-                    self.setGoal(0.85,-0.45,-3.1415*(1/4))
-                    self.setGoal(0.85,-0.45,-3.1415)
+                    self.setGoal(0.85,-0.4,0)
+                    self.setGoal(0.85,-0.4,-3.1415*(1/4))
+                    self.setGoal(0.85,-0.4,-3.1415)
                     self.waypoint_number = 7
                 elif self.waypoint_number == 7 or self.waypoint_number == 8:
                     self.setGoal(0.85,0.45,3.1415)
@@ -225,8 +248,6 @@ class domaeBot():
             self.see_enemy()
 
             
-    def escape(self):
-        self.setGoal(-0.85,-0.45,-3.1415/4)
     
     def near_enemy(self):
         x_difference = self.pose_x - self.e_detect.pose_x
@@ -238,10 +259,10 @@ class domaeBot():
             return False
     
     def strategy(self):
-        print ("strate")
+        #print ("strate")
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            print("near_enemy",self.e_detect.near_enemy)
+            #print("near_enemy",self.e_detect.near_enemy)
             if self.e_detect.near_enemy == False:
                 self.patrol()
                 #self.next_point = self.get_next_waypoint()
